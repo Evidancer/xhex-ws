@@ -18,5 +18,8 @@
   "homepage": "https://github.com/Evidancer/xhex-ws#readme",
   "dependencies": {
     "ws": "^8.2.2"
+  },
+  "engines": {
+    "node": "16.x"
   }
 }
