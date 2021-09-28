@@ -1,5 +1,5 @@
 const {Server} = require("ws");
-const wsport = 81;
+const wsport = process.env.PORT || 81;
 
 
 
