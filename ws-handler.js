@@ -380,7 +380,7 @@ class wsController{
                 pl_veh.cooldowns.rg = 150;
                 
             } else if(pl_veh.cooldowns.rg > 0) {
-                --pl_veh.cooldowns;
+                --pl_veh.cooldowns.rg;
             }
 
         });
