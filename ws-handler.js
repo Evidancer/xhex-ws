@@ -1,7 +1,6 @@
 const axios = require("axios");
 const hc = require("./httpconfig.json");
 
-const queue = {};
 const rooms = {};
 const inputs = {};
 
@@ -57,6 +56,7 @@ class wsController{
             res=res.data;
 
             if(!res.status){
+                console.log("UNVALIDATED ACCESS");
                 ws.close();
                 return;
             }   
@@ -84,6 +84,7 @@ class wsController{
         }).catch((err)=>{
 
             console.log(err);
+            console.log("ERROR");
             ws.close();
 
         })
@@ -136,8 +137,8 @@ class wsController{
                     bang: -Math.PI/2,
                     tang: -Math.PI/2,
                     cooldowns: {
-                        rg: 0
-                    }
+                        rg:1,
+                    },
                 },
                 {
                     id: 1,
@@ -146,7 +147,7 @@ class wsController{
                     bang: Math.PI/2,
                     tang: Math.PI/2,
                     cooldowns: {
-                        rg: 0
+                        rg: 1
                     }  
                 }
             ],
@@ -220,60 +221,171 @@ class wsController{
 
     static calcFrame(room){
 
-        let veh = {
+        /* 
+        room.units = {
+            veh:[
+                {
+                    id: 0,
+                    team: 0,
+                    bpos: [400, 700],
+                    bang: -Math.PI/2,
+                    tang: -Math.PI/2,
+                    cooldowns: {
+                        rg: 0
+                    }
+                },
+                {
+                    id: 1,
+                    team: 1,
+                    bpos: [400, 100],
+                    bang: Math.PI/2,
+                    tang: Math.PI/2,
+                    cooldowns: {
+                        rg: 0
+                    }  
+                }
+            ],
+            
+            proj: [
+                {
+                    pos: [x, y],
+                    ang: alpha
+                }
+            ]
+            
+        }
+        */
+
+        let vehSpec = {
             vel: 8,
             avel: 0.1,
             rad: 60
         }
 
-        let proj = {
+
+        let projSpec = {
             vel: 14,
         }
+
+        function pseudoScalar(P, A, B){
+            return (B[0] - A[0]) * (P[1] - A[1]) - (B[1] - A[1]) * (P[0] - A[0]);
+        }
+
+
+
+        room.units.veh.forEach(el => {
+            let sinA = Math.sin(el.bang), cosA = Math.cos(el.bang);
+            el.vers = [
+                [50*cosA - 30*sinA, 50*sinA + 30*cosA],
+                [-50*cosA - 30*sinA, -50*sinA + 30*cosA],
+                [-50*cosA - -30*sinA, -50*sinA + -30*cosA],
+                [50*cosA - -30*sinA, 50*sinA + -30*cosA],
+            ]
+        });
+
+
 
         let players = Object.values(room.players);
         let result = -1;
 
+
         players.forEach((pl)=>{
             let units = room.units;
             let pl_veh = units.veh[pl.unit];
-            // let en_vehs = units.veh.filter((veh)=>{
-            //     if(unit.id != pl.init) return true; 
-            // });
+
             let pl_inputs = inputs[pl.ws.id];
 
+            
+            //////////    СЧИТАЕМ ПОПАДАНИЯ И ДВИГАЕМ СНАРЯДЫ И УДАЛЯЕМ
 
-            /*
-                {
-                    unit: ;
-                    pos: [,];
-                    vel: [,];
-                    ang: ;
+            units.proj.forEach((p,i) => {
+                let vel = [
+                    projSpec.vel*Math.cos(p.ang),
+                    projSpec.vel*Math.sin(p.ang),
+                ];
+
+                let deltaX = vel[0]/10;
+                let deltaY = vel[1]/10;
+
+                for(let i = 0; i < 10; ++i){
+                    p.pos[0] += deltaX;
+                    p.pos[1] += deltaY;
+                     
+                    let p1 = pseudoScalar(p.pos, pl_veh.vers[0],pl_veh.vers[1]);
+                    let p2 = pseudoScalar(p.pos, pl_veh.vers[1],pl_veh.vers[2]);
+                    let p3 = pseudoScalar(p.pos, pl_veh.vers[2],pl_veh.vers[3]);
+                    let p4 = pseudoScalar(p.pos, pl_veh.vers[3],pl_veh.vers[0]);
+                    
+                    if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
+                        p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
+                            result  = +!pl_veh.team;
+                    }  
                 }
-            */
 
-            // let en_projs = units.proj.fileter((p)=>{
-            //     if(p.unit != pl.unit) return true;
-            // });
+                if(p.pos[0]**2 > 800**2 || p.pos[0] < 0 || p.pos[1]**2 > 800**2 || p.pos[1] < 0){
+                    units.proj.splice(i,1);
+                }
+            });            
 
 
-            pl_veh.bang += veh.avel*pl_inputs.dir[1];
+
+            //////////  ДВИГАЕМ ТЕХНИКУ
+
+            pl_veh.bang += vehSpec.avel*pl_inputs.dir[1];
 
             let vel_vec = [
-                pl_inputs.dir[0]*veh.vel*Math.cos(pl_veh.bang),
-                pl_inputs.dir[0]*veh.vel*Math.sin(pl_veh.bang),
+                pl_inputs.dir[0]*vehSpec.vel*Math.cos(pl_veh.bang),
+                pl_inputs.dir[0]*vehSpec.vel*Math.sin(pl_veh.bang),
             ];
 
             pl_veh.bpos[0] += vel_vec[0];
             pl_veh.bpos[1] += vel_vec[1];
+            
+            if(pl_veh.bpos[0] > 800){
+                pl_veh.bpos[0] = 800;
+            }
+            if(pl_veh.bpos[0] < 0){
+                pl_veh.bpos[0] = 0;
+            }
+            if(pl_veh.bpos[1] > 800){
+                pl_veh.bpos[1] = 800;
+            }
+            if(pl_veh.bpos[1] < 0){
+                pl_veh.bpos[1] = 0;
+            }
+            
 
             if(pl_inputs.mpos)
                 pl_veh.tang = getRelAngle(...pl_veh.bpos, ...pl_inputs.mpos);
             else
                 pl_veh.tang = pl_veh.bang;
 
+
+
+            /////// СОЗДАЁМ СНАРЯДЫ
+
+            console.log(pl_inputs);
+
+            if(pl_inputs.mb0 && !pl_veh.cooldowns.rg) {
+                let np = {
+                    pos:[
+                        pl_veh.bpos[0] + 65*Math.cos(pl_veh.tang),
+                        pl_veh.bpos[1] + 65*Math.sin(pl_veh.tang)
+                    ],
+                    ang: pl_veh.tang
+                };
+
+                units.proj.push(np);
+                console.log(pl_veh);
+                pl_veh.cooldowns.rg = 150;
+                
+            } else if(pl_veh.cooldowns.rg > 0) {
+                --pl_veh.cooldowns;
+            }
+
         });
 
-        return -1;
+        return result;
 
         // function moveUnit(unit, inputs){
         //     let vel = 10;
@@ -312,6 +424,7 @@ class wsController{
 
     static finishGame(room){
         room.players.forEach((el)=>{
+            console.log("Finishng GAME");
             el.ws.close();
         });
     }
