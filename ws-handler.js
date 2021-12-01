@@ -17,7 +17,6 @@ module.exports = function handler(ws) {
 class wsController{
     /////////////////////////////////////////
     static router(req){
-        console.log("Message!!");
         let ws = this;
 
         switch(req.type){
@@ -33,8 +32,7 @@ class wsController{
         let ws = this;
         let req = JSON.parse(msg.toString('utf-8'));
         
-        console.log("message!");
-        console.log(ws.verified);
+        //console.log(ws.verified);
         
         if(ws.verified){
             wsController.router.bind(ws)(req);
@@ -152,7 +150,16 @@ class wsController{
                 }
             ],
             
-            proj: []
+            proj: [
+                /*
+                {
+                    pos: [x, y],
+                    ang: alpha,
+                    team: int
+                }
+                */
+            ]
+
             
         }
 
@@ -249,7 +256,8 @@ class wsController{
             proj: [
                 {
                     pos: [x, y],
-                    ang: alpha
+                    ang: alpha,
+                    team: int
                 }
             ]
             
@@ -276,10 +284,10 @@ class wsController{
         room.units.veh.forEach(el => {
             let sinA = Math.sin(el.bang), cosA = Math.cos(el.bang);
             el.vers = [
-                [50*cosA - 30*sinA, 50*sinA + 30*cosA],
-                [-50*cosA - 30*sinA, -50*sinA + 30*cosA],
-                [-50*cosA - -30*sinA, -50*sinA + -30*cosA],
-                [50*cosA - -30*sinA, 50*sinA + -30*cosA],
+                [50*cosA - 30*sinA + el.bpos[0], 50*sinA + 30*cosA + el.bpos[1]],
+                [-50*cosA - 30*sinA + el.bpos[0], -50*sinA + 30*cosA + el.bpos[1]],
+                [-50*cosA - -30*sinA + el.bpos[0], -50*sinA + -30*cosA + el.bpos[1]],
+                [50*cosA - -30*sinA + el.bpos[0], 50*sinA + -30*cosA + el.bpos[1]],
             ]
         });
 
@@ -306,6 +314,11 @@ class wsController{
 
                 let deltaX = vel[0]/10;
                 let deltaY = vel[1]/10;
+                
+                console.log(pl_veh.vers);
+
+                console.log("p:");
+                console.log(p);console.log("-----------------------------------");
 
                 for(let i = 0; i < 10; ++i){
                     p.pos[0] += deltaX;
@@ -316,14 +329,20 @@ class wsController{
                     let p3 = pseudoScalar(p.pos, pl_veh.vers[2],pl_veh.vers[3]);
                     let p4 = pseudoScalar(p.pos, pl_veh.vers[3],pl_veh.vers[0]);
                     
+                    console.log("pps:");
+                    console.log(p1 + " --- " + p2 + " --- " + p3 + " --- " + p4);
+
                     if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
                         p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
                             result  = +!pl_veh.team;
+
+                            console.log("HIT!!!!!!!!!!!!!!!");
                     }  
                 }
 
                 if(p.pos[0]**2 > 800**2 || p.pos[0] < 0 || p.pos[1]**2 > 800**2 || p.pos[1] < 0){
                     units.proj.splice(i,1);
+                    console.log("OUT OF BOUNDS!!!!!!!________");
                 }
             });            
 
@@ -364,23 +383,22 @@ class wsController{
 
             /////// СОЗДАЁМ СНАРЯДЫ
 
-            console.log(pl_inputs);
-
             if(pl_inputs.mb0 && !pl_veh.cooldowns.rg) {
                 let np = {
                     pos:[
                         pl_veh.bpos[0] + 65*Math.cos(pl_veh.tang),
                         pl_veh.bpos[1] + 65*Math.sin(pl_veh.tang)
                     ],
-                    ang: pl_veh.tang
+                    ang: pl_veh.tang,
+                    team: pl_veh.team
                 };
 
+
                 units.proj.push(np);
-                console.log(pl_veh);
-                pl_veh.cooldowns.rg = 150;
+                pl_veh.cooldowns.rg = 90;
                 
             } else if(pl_veh.cooldowns.rg > 0) {
-                --pl_veh.cooldowns;
+                --pl_veh.cooldowns.rg;
             }
 
         });
@@ -415,7 +433,6 @@ class wsController{
     /////////////////////////////
 
     static handleInputs(data){
-        console.log(data);
         let ws = this;
         inputs[ws.id] = data;
     }
@@ -423,7 +440,8 @@ class wsController{
     //////////////////////////////
 
     static finishGame(room){
-        room.players.forEach((el)=>{
+        console.log(room.players);
+        Object.values(room.players).forEach((el)=>{
             console.log("Finishng GAME");
             el.ws.close();
         });
