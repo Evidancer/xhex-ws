@@ -134,8 +134,12 @@ class wsController{
                     bpos: [400, 700],
                     bang: -Math.PI/2,
                     tang: -Math.PI/2,
+                    statuses:{
+                        shield:false,
+                    },
                     cooldowns: {
-                        rg:1,
+                        rg:0,
+                        sh:0,
                     },
                 },
                 {
@@ -144,8 +148,12 @@ class wsController{
                     bpos: [400, 100],
                     bang: Math.PI/2,
                     tang: Math.PI/2,
+                    statuses:{
+                        shield:false,
+                    },
                     cooldowns: {
-                        rg: 1
+                        rg:0,
+                        sh:0,
                     }  
                 }
             ],
@@ -314,11 +322,6 @@ class wsController{
 
                 let deltaX = vel[0]/10;
                 let deltaY = vel[1]/10;
-                
-                console.log(pl_veh.vers);
-
-                console.log("p:");
-                console.log(p);console.log("-----------------------------------");
 
                 for(let i = 0; i < 10; ++i){
                     p.pos[0] += deltaX;
@@ -328,21 +331,20 @@ class wsController{
                     let p2 = pseudoScalar(p.pos, pl_veh.vers[1],pl_veh.vers[2]);
                     let p3 = pseudoScalar(p.pos, pl_veh.vers[2],pl_veh.vers[3]);
                     let p4 = pseudoScalar(p.pos, pl_veh.vers[3],pl_veh.vers[0]);
-                    
-                    console.log("pps:");
-                    console.log(p1 + " --- " + p2 + " --- " + p3 + " --- " + p4);
 
-                    if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
+                    console.log
+
+                    if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000){
+                        units.proj.splice(i,1);
+                        break;
+                    } else if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
                         p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
                             result  = +!pl_veh.team;
-
-                            console.log("HIT!!!!!!!!!!!!!!!");
-                    }  
+                    }
                 }
 
                 if(p.pos[0]**2 > 800**2 || p.pos[0] < 0 || p.pos[1]**2 > 800**2 || p.pos[1] < 0){
                     units.proj.splice(i,1);
-                    console.log("OUT OF BOUNDS!!!!!!!________");
                 }
             });            
 
@@ -399,6 +401,16 @@ class wsController{
                 
             } else if(pl_veh.cooldowns.rg > 0) {
                 --pl_veh.cooldowns.rg;
+            }
+
+            ///// СОЗДАЁМ ЩИТ
+            if(pl_inputs.mb2 && !pl_veh.cooldowns.sh){
+                pl_veh.statuses.shield = true;
+                pl_veh.cooldowns.sh = 100;
+            } else if (pl_veh.cooldowns.sh > 0) {
+                if(pl_veh.cooldowns.sh == 70) // 70
+                    pl_veh.statuses.shield = false;
+                --pl_veh.cooldowns.sh;
             }
 
         });
