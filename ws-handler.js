@@ -332,9 +332,7 @@ class wsController{
                     let p3 = pseudoScalar(p.pos, pl_veh.vers[2],pl_veh.vers[3]);
                     let p4 = pseudoScalar(p.pos, pl_veh.vers[3],pl_veh.vers[0]);
 
-                    console.log
-
-                    if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000){
+                    if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000 && pl_veh.statuses.shield){
                         units.proj.splice(i,1);
                         break;
                     } else if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
