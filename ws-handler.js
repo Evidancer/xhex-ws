@@ -272,16 +272,27 @@ class wsController{
         }
         */
 
+        // let vehSpec = {
+        //     vel: 8,
+        //     avel: 0.1,
+        //     rad: 60
+        // }
+
+        
         let vehSpec = {
-            vel: 8,
-            avel: 0.1,
+            vel: 5,
+            avel: 0.05,
             rad: 60
         }
 
 
         let projSpec = {
-            vel: 14,
+            vel: 9,
         }
+
+        // let projSpec = {
+        //     vel: 14,
+        // }
 
         function pseudoScalar(P, A, B){
             return (B[0] - A[0]) * (P[1] - A[1]) - (B[1] - A[1]) * (P[0] - A[0]);
