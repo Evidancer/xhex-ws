@@ -217,11 +217,12 @@ class wsController{
             let roundStatus = wsController.calcFrame(room);
 
             if(~roundStatus){
+
                 room.score[roundStatus]++;
 
                 clearInterval(room.frameInterval);
 
-                if(room.round == 4){
+                if(room.round == 9){
                     wsController.finishGame(room);
                 } else {
                     wsController.startRound(room);
@@ -461,7 +462,8 @@ class wsController{
     //////////////////////////////
 
     static finishGame(room){
-        console.log(room.players);
+        
+        clearInterval(room.frameInterval);
         Object.values(room.players).forEach((el)=>{
             console.log("Finishng GAME");
             el.ws.close();
