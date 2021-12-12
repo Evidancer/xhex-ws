@@ -108,7 +108,7 @@ class wsController{
 
     static startGame(room){
         room.round = 0;
-        room.score = [0, 0];
+        room.public.score = [0, 0];
         room.public.round = 0;
         room.public.score = [0, 0];
 
@@ -136,11 +136,13 @@ class wsController{
                     tang: -Math.PI/2,
                     statuses:{
                         shield:false,
+                        shot:false,
                     },
                     cooldowns: {
                         rg:0,
                         sh:0,
                     },
+                    hp: 3,
                 },
                 {
                     id: 1,
@@ -154,7 +156,8 @@ class wsController{
                     cooldowns: {
                         rg:0,
                         sh:0,
-                    }  
+                    },
+                    hp: 3,
                 }
             ],
             
@@ -166,9 +169,80 @@ class wsController{
                     team: int
                 }
                 */
+            ],
+
+            blocks:[
+                // {
+                //     pos:[x,y],
+                //     ang:alpha,
+                //     vers: [[,],[,],[,],[,]];
+                // }                
+
             ]
 
             
+        }
+
+        for(let i = 1; i <= 20; ++i){
+            room.units.blocks.push(
+                {
+                    pos:[40*i-20,-20],ang:0,
+                    vers:[
+                        [40*i, 0],
+                        [40*i, -40],
+                        [40*i-40, -40],
+                        [40*i-40, 0],
+                    ],
+                },
+                {
+                    pos:[40*i-20,820],ang:0,
+                    vers:[
+                        [40*i, 840],
+                        [40*i, 800],
+                        [40*i-40, 800],
+                        [40*i-40, 840],
+                    ],
+                },
+                {
+                    pos:[-20,40*i-20],ang:0,
+                    vers:[
+                        [0, 40*i],
+                        [-40, 40*i],
+                        [-40, 40*i-40],
+                        [0, 40*i-40],
+                    ],
+                },
+                {
+                    pos:[820, 40*i-20],ang:0,
+                    vers:[
+                        [840, 40*i],
+                        [800, 40*i],
+                        [800, 40*i-40],
+                        [840, 40*i-40],
+                    ],
+                }
+            );
+        }
+
+        for(let i = 1; i <= 6; ++i){
+            room.units.blocks.push(
+                {pos:[280+40*i-20, 260],ang:0,
+                    vers:[
+                        [280+40*i, 280],
+                        [280+40*i, 240],
+                        [280+40*i-40, 240],
+                        [280+40*i-40, 280],
+                    ]
+                },
+                {pos:[280+40*i-20, 540],ang:0,
+                    vers:[
+                        [280+40*i, 560],
+                        [280+40*i, 520],
+                        [280+40*i-40, 520],
+                        [280+40*i-40, 560],
+                    ]
+                },
+            );
         }
 
         Object.values(room.players).forEach(pl=>{
@@ -209,20 +283,21 @@ class wsController{
                 pl.ws.send(JSON.stringify({
                     type: "res-frame",
                     data: {
-                        units: room.units
+                        units: room.units,
+                        score: room.public.score,
                     }
                 }));
             });
 
             let roundStatus = wsController.calcFrame(room);
-
+            
             if(~roundStatus){
 
-                room.score[roundStatus]++;
+                room.public.score[roundStatus]++;
 
                 clearInterval(room.frameInterval);
 
-                if(room.round == 9){
+                if(room.round == 6){
                     wsController.finishGame(room);
                 } else {
                     wsController.startRound(room);
@@ -335,6 +410,29 @@ class wsController{
                 let deltaX = vel[0]/10;
                 let deltaY = vel[1]/10;
 
+                
+
+                let intersects = false;
+                for(let block of units.blocks){
+                    let p1 = pseudoScalar(p.pos, block.vers[0],block.vers[1]);
+                    let p2 = pseudoScalar(p.pos, block.vers[1],block.vers[2]);
+                    let p3 = pseudoScalar(p.pos, block.vers[2],block.vers[3]);
+                    let p4 = pseudoScalar(p.pos, block.vers[3],block.vers[0]);
+
+                    if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
+                       p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
+                            intersects = true;
+                            break;
+                    }
+                }
+                if(intersects){
+                    units.proj.splice(i,1);
+                    return;              
+                }
+
+
+                let shot = false;
+
                 for(let i = 0; i < 10; ++i){
                     p.pos[0] += deltaX;
                     p.pos[1] += deltaY;
@@ -349,9 +447,20 @@ class wsController{
                         break;
                     } else if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
                         p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
-                            result  = +!pl_veh.team;
+                            shot = true;
+                            break;
                     }
                 }
+
+                if(shot){
+                    units.proj.splice(i,1);
+                    --pl_veh.hp;
+                } 
+                if(!pl_veh.hp){
+                    result = +!pl_veh.team;
+                 }
+                
+
 
                 if(p.pos[0]**2 > 800**2 || p.pos[0] < 0 || p.pos[1]**2 > 800**2 || p.pos[1] < 0){
                     units.proj.splice(i,1);
@@ -362,29 +471,61 @@ class wsController{
 
             //////////  ДВИГАЕМ ТЕХНИКУ
 
-            pl_veh.bang += vehSpec.avel*pl_inputs.dir[1];
+            let newData = {bpos:[pl_veh.bpos[0],pl_veh.bpos[1]], bang:pl_veh.bang};
+
+            newData.bang += vehSpec.avel*pl_inputs.dir[1];
 
             let vel_vec = [
-                pl_inputs.dir[0]*vehSpec.vel*Math.cos(pl_veh.bang),
-                pl_inputs.dir[0]*vehSpec.vel*Math.sin(pl_veh.bang),
+                pl_inputs.dir[0]*vehSpec.vel*Math.cos(newData.bang),
+                pl_inputs.dir[0]*vehSpec.vel*Math.sin(newData.bang),
             ];
 
-            pl_veh.bpos[0] += vel_vec[0];
-            pl_veh.bpos[1] += vel_vec[1];
+            newData.bpos[0] += vel_vec[0];
+            newData.bpos[1] += vel_vec[1];
             
-            if(pl_veh.bpos[0] > 800){
-                pl_veh.bpos[0] = 800;
+            if(newData.bpos[0] > 800){
+                newData.bpos[0] = 800;
             }
-            if(pl_veh.bpos[0] < 0){
-                pl_veh.bpos[0] = 0;
+            if(newData.bpos[0] < 0){
+                newData.bpos[0] = 0;
             }
-            if(pl_veh.bpos[1] > 800){
-                pl_veh.bpos[1] = 800;
+            if(newData.bpos[1] > 800){
+                newData.bpos[1] = 800;
             }
-            if(pl_veh.bpos[1] < 0){
-                pl_veh.bpos[1] = 0;
+            if(newData.bpos[1] < 0){
+                newData.bpos[1] = 0;
             }
             
+            let sinA = Math.sin(newData.bang), cosA = Math.cos(newData.bang);
+            newData.vers = [
+                [50*cosA - 30*sinA + newData.bpos[0], 50*sinA + 30*cosA + newData.bpos[1]],
+                [-50*cosA - 30*sinA + newData.bpos[0], -50*sinA + 30*cosA + newData.bpos[1]],
+                [-50*cosA - -30*sinA + newData.bpos[0], -50*sinA + -30*cosA + newData.bpos[1]],
+                [50*cosA - -30*sinA + newData.bpos[0], 50*sinA + -30*cosA + newData.bpos[1]],
+            ]
+
+            let intersects = false;
+            for(let block of units.blocks){
+                for(let i = 0; i < 4; ++i){
+                    let p1 = pseudoScalar(newData.vers[i], block.vers[0],block.vers[1]);
+                    let p2 = pseudoScalar(newData.vers[i], block.vers[1],block.vers[2]);
+                    let p3 = pseudoScalar(newData.vers[i], block.vers[2],block.vers[3]);
+                    let p4 = pseudoScalar(newData.vers[i], block.vers[3],block.vers[0]);
+
+                    if(p1 > 0 && p2 > 0 && p3 > 0 && p4> 0 ||
+                        p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0){
+                            intersects = true;
+                            break;
+                    }
+                }
+                if(intersects) break;
+            }
+            if(!intersects){
+                pl_veh.bpos[0] = newData.bpos[0];
+                pl_veh.bpos[1] = newData.bpos[1];
+                pl_veh.bang = newData.bang;
+            }
+
 
             if(pl_inputs.mpos)
                 pl_veh.tang = getRelAngle(...pl_veh.bpos, ...pl_inputs.mpos);
@@ -468,6 +609,7 @@ class wsController{
             console.log("Finishng GAME");
             el.ws.close();
         });
+        delete rooms[room.id];
     }
 
     //////////////////////////////////////////////////////////
