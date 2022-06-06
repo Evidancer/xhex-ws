@@ -111,6 +111,9 @@ class wsController{
         room.public.score = [0, 0];
         room.public.round = 0;
         room.public.score = [0, 0];
+        room.public.hits = [0, 0];
+        room.public.misses = [0, 0];
+        room.public.deflects = [0, 0];
 
         Object.values(room.players)[0].team = 0;
         Object.values(room.players)[1].team = 1;        
@@ -444,6 +447,8 @@ class wsController{
 
                     if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000 && pl_veh.statuses.shield){
                         units.proj.splice(i,1);
+                        room.public.deflects[pl_veh.id]++;
+                        room.public.misses[+!pl_veh.id]--;
                         break;
                     } else if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
                         p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
@@ -455,6 +460,8 @@ class wsController{
                 if(shot){
                     units.proj.splice(i,1);
                     --pl_veh.hp;
+                    room.public.hits[+!pl_veh.id]++;
+                    room.public.misses[+!pl_veh.id]--;
                 } 
                 if(!pl_veh.hp){
                     result = +!pl_veh.team;
@@ -549,7 +556,8 @@ class wsController{
 
                 units.proj.push(np);
                 pl_veh.cooldowns.rg = 90;
-                
+                room.public.misses[pl_veh.id]++;
+
             } else if(pl_veh.cooldowns.rg > 0) {
                 --pl_veh.cooldowns.rg;
             }
@@ -609,13 +617,35 @@ class wsController{
             console.log("Finishng GAME");
             el.ws.close();
         });
+
+        console.log(room);
+
+        try{
+            axios.post(`${hc.url}/api/save-game-record`, {
+                room: room.id,
+                time: Date.now(),
+                blue_player: room.public.players[0],
+                red_player: room.public.players[1],
+                result: room.public.score[0]>room.public.score[1] ? 0: 1,
+                score_red: room.public.score[1],
+                score_blue: room.public.score[0],
+                hits_blue: room.public.hits[0],
+                hits_red: room.public.hits[1],
+                misses_blue: room.public.misses[0],
+                misses_red: room.public.misses[1],
+                deflects_blue: room.public.deflects[0],
+                deflects_red: room.public.deflects[1],
+            }).then(()=>{}).catch(()=>{});
+        } catch { }
+
+        
         delete rooms[room.id];
     }
 
-    /////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////
 }
 
-
+``
 
 
 // webSocketServer.on('connection', function(ws){
