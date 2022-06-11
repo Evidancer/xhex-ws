@@ -140,6 +140,7 @@ class wsController{
                     statuses:{
                         shield:false,
                         shot:false,
+                        antiarmor:false,
                     },
                     cooldowns: {
                         rg:0,
@@ -155,6 +156,8 @@ class wsController{
                     tang: Math.PI/2,
                     statuses:{
                         shield:false,
+                        shot:false,
+                        antiarmor:false,
                     },
                     cooldowns: {
                         rg:0,
@@ -169,7 +172,8 @@ class wsController{
                 {
                     pos: [x, y],
                     ang: alpha,
-                    team: int
+                    team: int,
+                    antiarmor: bool
                 }
                 */
             ],
@@ -181,14 +185,41 @@ class wsController{
                 //     vers: [[,],[,],[,],[,]];
                 // }                
 
-            ]
+            ],
 
+            items:[
+                {
+                    pos: [400, 400],
+                    ang: 0,
+                    type: 0, // heal,
+                    cd: 720,
+                    stdcd: 720,
+                    status: false,
+                },
+                {
+                    pos: [400, 700],
+                    ang: 0,
+                    type: 1, // antiarmor,
+                    cd: 600,
+                    stdcd: 600,
+                    status: false,
+                },
+                {
+                    pos: [400, 100],
+                    ang: 0,
+                    type: 1, // antiarmor,
+                    cd: 600,
+                    stdcd: 600,
+                    status: false,
+                }
+            ]
             
         }
 
         for(let i = 1; i <= 20; ++i){
             room.units.blocks.push(
                 {
+                    hp:7,
                     pos:[40*i-20,-20],ang:0,
                     vers:[
                         [40*i, 0],
@@ -198,6 +229,7 @@ class wsController{
                     ],
                 },
                 {
+                    hp:7,
                     pos:[40*i-20,820],ang:0,
                     vers:[
                         [40*i, 840],
@@ -207,6 +239,7 @@ class wsController{
                     ],
                 },
                 {
+                    hp:7,
                     pos:[-20,40*i-20],ang:0,
                     vers:[
                         [0, 40*i],
@@ -216,6 +249,7 @@ class wsController{
                     ],
                 },
                 {
+                    hp:7,
                     pos:[820, 40*i-20],ang:0,
                     vers:[
                         [840, 40*i],
@@ -229,7 +263,9 @@ class wsController{
 
         for(let i = 1; i <= 6; ++i){
             room.units.blocks.push(
-                {pos:[280+40*i-20, 260],ang:0,
+                {
+                    hp:7,
+                    pos:[280+40*i-20, 260],ang:0,
                     vers:[
                         [280+40*i, 280],
                         [280+40*i, 240],
@@ -237,7 +273,9 @@ class wsController{
                         [280+40*i-40, 280],
                     ]
                 },
-                {pos:[280+40*i-20, 540],ang:0,
+                {
+                    hp:7,
+                    pos:[280+40*i-20, 540],ang:0,
                     vers:[
                         [280+40*i, 560],
                         [280+40*i, 520],
@@ -344,7 +382,8 @@ class wsController{
                 {
                     pos: [x, y],
                     ang: alpha,
-                    team: int
+                    team: int,
+                    antiarmor: bool
                 }
             ]
             
@@ -389,6 +428,20 @@ class wsController{
             ]
         });
 
+        
+        ///////////////////// СПАВНИМ ПРЕДМЕТЫ
+
+        room.units.items.forEach(item=>{
+            if(item.cd <= 0 && !item.status){
+                item.status = true;
+                item.cd = item.stdcd;
+            } else if(item.cd > 0 && !item.status) {
+                --item.cd;
+            }
+        });
+
+
+
 
 
         let players = Object.values(room.players);
@@ -402,7 +455,7 @@ class wsController{
             let pl_inputs = inputs[pl.ws.id];
 
             
-            //////////    СЧИТАЕМ ПОПАДАНИЯ И ДВИГАЕМ СНАРЯДЫ И УДАЛЯЕМ
+            //////////    СЧИТАЕМ ПОПАДАНИЯ И ДВИГАЕМ, ОТРАЖАЕМ СНАРЯДЫ И УДАЛЯЕМ
 
             units.proj.forEach((p,i) => {
                 let vel = [
@@ -425,13 +478,23 @@ class wsController{
                     if(p1 >= 0 && p2 >= 0 && p3 >= 0 && p4>= 0 ||
                        p1 <= 0 && p2 <= 0 && p3 <= 0 && p4 <= 0){
                             intersects = true;
-                            break;
+                    }
+                    if(intersects){
+                        if (p.antiarmor){
+                            units.blocks.splice(units.blocks.indexOf(block),1);
+                            units.proj.splice(i,1);
+                            return;
+                        }
+                        block.hp--;
+                        if(block.hp <= 0){
+                            units.blocks.splice(units.blocks.indexOf(block),1);
+                        }
+                        units.proj.splice(i,1);
+                        return;              
                     }
                 }
-                if(intersects){
-                    units.proj.splice(i,1);
-                    return;              
-                }
+                 
+                
 
 
                 let shot = false;
@@ -439,14 +502,26 @@ class wsController{
                 for(let i = 0; i < 10; ++i){
                     p.pos[0] += deltaX;
                     p.pos[1] += deltaY;
-                     
+                    
+                    if(p.team == pl_veh.team){
+                        continue;
+                    }
+
                     let p1 = pseudoScalar(p.pos, pl_veh.vers[0],pl_veh.vers[1]);
                     let p2 = pseudoScalar(p.pos, pl_veh.vers[1],pl_veh.vers[2]);
                     let p3 = pseudoScalar(p.pos, pl_veh.vers[2],pl_veh.vers[3]);
                     let p4 = pseudoScalar(p.pos, pl_veh.vers[3],pl_veh.vers[0]);
 
-                    if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000 && pl_veh.statuses.shield){
-                        units.proj.splice(i,1);
+                    if((p.pos[0]-pl_veh.bpos[0])**2 + (p.pos[1]-pl_veh.bpos[1])**2 <= 4000 
+                        && pl_veh.statuses.shield 
+                        && !p.antiarmor){
+                        // units.proj.splice(i,1);
+                        p.team = +!p.team;
+
+                        p.ang = (
+                            Math.PI + 2*getAngle((p.pos[0]-pl_veh.bpos[0]),(p.pos[1]-pl_veh.bpos[1])) - p.ang
+                        );
+
                         room.public.deflects[pl_veh.id]++;
                         room.public.misses[+!pl_veh.id]--;
                         break;
@@ -524,15 +599,29 @@ class wsController{
                             intersects = true;
                             break;
                     }
+
+                    p1 = pseudoScalar(block.vers[i], newData.vers[0], newData.vers[1]);
+                    p2 = pseudoScalar(block.vers[i], newData.vers[1], newData.vers[2]);
+                    p3 = pseudoScalar(block.vers[i], newData.vers[2], newData.vers[3]);
+                    p4 = pseudoScalar(block.vers[i], newData.vers[3], newData.vers[0]);
+
+                    if(p1 > 0 && p2 > 0 && p3 > 0 && p4> 0 ||
+                        p1 < 0 && p2 < 0 && p3 < 0 && p4 < 0){
+                            intersects = true;
+                            break;
+                    }
                 }
                 if(intersects) break;
             }
+
+
             if(!intersects){
                 pl_veh.bpos[0] = newData.bpos[0];
                 pl_veh.bpos[1] = newData.bpos[1];
                 pl_veh.bang = newData.bang;
             }
 
+            /// Угол
 
             if(pl_inputs.mpos)
                 pl_veh.tang = getRelAngle(...pl_veh.bpos, ...pl_inputs.mpos);
@@ -540,6 +629,25 @@ class wsController{
                 pl_veh.tang = pl_veh.bang;
 
 
+            /////// Проверяем подбор предмета
+
+
+            units.items.forEach(item=>{
+                if((pl_veh.bpos[0]-item.pos[0])**2 
+                    +(pl_veh.bpos[1]-item.pos[1])**2 <= 2500
+                    && item.status){
+                    switch(item.type){
+                        case 0: // heal
+                            pl_veh.hp = pl_veh.hp >= 3? pl_veh.hp: pl_veh.hp+1; 
+                            break;
+                        case 1: // antiarmor
+                            pl_veh.statuses.antiarmor = true; 
+                            break;
+                    }
+                    item.status = false;
+                }
+            })
+            
 
             /////// СОЗДАЁМ СНАРЯДЫ
 
@@ -550,9 +658,13 @@ class wsController{
                         pl_veh.bpos[1] + 65*Math.sin(pl_veh.tang)
                     ],
                     ang: pl_veh.tang,
-                    team: pl_veh.team
+                    team: pl_veh.team,
+                    antiarmor: pl_veh.statuses.antiarmor
                 };
 
+                if(pl_veh.statuses.antiarmor){
+                    pl_veh.statuses.antiarmor = false;
+                }
 
                 units.proj.push(np);
                 pl_veh.cooldowns.rg = 90;
